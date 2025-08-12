@@ -13,7 +13,22 @@
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('index') }}">Project Tracker</a>
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                Project Tracker
+                {% if config.get('DEBUG', False) %}
+                    <span class="badge bg-warning text-dark ms-2">BETA</span>
+                {% endif %}
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">
+                    <i class="bi bi-house"></i> Projects
+                </a>
+                {% if config.get('DEBUG', False) %}
+                    <a class="nav-link" href="/beta">
+                        <i class="bi bi-info-circle"></i> Beta Info
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </nav>
     <div class="container py-4">

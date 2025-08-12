@@ -3,14 +3,33 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from datetime import datetime, date, timedelta
 
+# Beta configuration import
+try:
+    from beta_config import get_beta_config, is_beta_feature_enabled
+    BETA_MODE = True
+except ImportError:
+    BETA_MODE = False
+    def get_beta_config(): return {}
+    def is_beta_feature_enabled(feature): return False
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'tracker.db')
+
+# Use beta database if in beta mode
+if BETA_MODE:
+    beta_config = get_beta_config()
+    DB_PATH = os.path.join(BASE_DIR, beta_config.get('db_name', 'tracker_beta.db'))
+    SECRET_KEY = beta_config.get('secret_key', 'beta_secret_key_change_in_production')
+    DEBUG_MODE = beta_config.get('debug_mode', True)
+else:
+    DB_PATH = os.path.join(BASE_DIR, 'tracker.db')
+    SECRET_KEY = 'change_this_secret'
+    DEBUG_MODE = False
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'change_this_secret'
+app.config['SECRET_KEY'] = SECRET_KEY
+app.config['DEBUG'] = DEBUG_MODE
 
 db = SQLAlchemy(app)
 
@@ -834,6 +853,21 @@ def init_db():
             print(f"⚠️  Error checking/creating TaskAttachment table: {e}")
         
         print("✓ Database initialized (tracker.db)")
+
+
+# Beta information route
+@app.route('/beta')
+def beta_info():
+    """Display beta version information and features"""
+    if BETA_MODE:
+        beta_config = get_beta_config()
+        return render_template('beta_info.html', 
+                             beta_config=beta_config,
+                             beta_mode=True)
+    else:
+        return render_template('beta_info.html', 
+                             beta_config={},
+                             beta_mode=False)
 
 
 # -------------------------------------------------------------------

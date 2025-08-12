@@ -1,0 +1,42 @@
+# Beta Requirements for Project Tracker
+# This file includes additional dependencies for beta features
+
+# Core Requirements (same as main)
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Werkzeug==2.3.7
+
+# Beta-Specific Dependencies
+Flask-CORS==4.0.0
+Flask-Login==0.6.3
+Flask-WTF==1.1.1
+WTForms==3.0.1
+
+# Development and Testing Tools
+pytest==7.4.3
+pytest-flask==1.3.0
+coverage==7.3.2
+
+# Performance Monitoring
+Flask-Profiler==1.8
+memory-profiler==0.61.0
+
+# Enhanced UI Components
+Flask-Bootstrap==3.3.7.1
+Flask-Assets==2.1.0
+
+# API Development
+marshmallow==3.20.1
+Flask-RESTful==0.3.10
+
+# Security Enhancements
+Flask-Talisman==1.1.0
+Flask-SeaSurf==1.1.1
+
+# Database Enhancements
+Flask-Migrate==4.0.5
+alembic==1.12.1
+
+# Logging and Monitoring
+structlog==23.2.0
+sentry-sdk[flask]==1.38.0

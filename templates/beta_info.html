@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Beta Information - Project Tracker{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">
+                        {% if beta_mode %}
+                            🚀 Project Tracker Beta Version
+                        {% else %}
+                            ℹ️ Project Tracker Information
+                        {% endif %}
+                    </h2>
+                </div>
+                <div class="card-body">
+                    {% if beta_mode %}
+                        <div class="alert alert-info">
+                            <h5>🎯 Beta Mode Active</h5>
+                            <p>You are currently running the beta version of Project Tracker with enhanced features and experimental capabilities.</p>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h4>📊 Beta Configuration</h4>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Version:</strong></td>
+                                            <td>{{ beta_config.version }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Database:</strong></td>
+                                            <td>{{ beta_config.db_name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Theme:</strong></td>
+                                            <td>{{ beta_config.theme }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>API Version:</strong></td>
+                                            <td>{{ beta_config.api_version }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Debug Mode:</strong></td>
+                                            <td>
+                                                {% if beta_config.debug_mode %}
+                                                    <span class="badge bg-success">Enabled</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Disabled</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h4>🔧 Beta Features</h4>
+                                <ul class="list-group list-group-flush">
+                                    {% if beta_config.experimental_features %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-flask text-warning"></i> Experimental Features
+                                        </li>
+                                    {% endif %}
+                                    {% if beta_config.beta_ui %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-palette text-info"></i> Enhanced UI
+                                        </li>
+                                    {% endif %}
+                                    {% if beta_config.beta_api %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-code text-success"></i> Beta API
+                                        </li>
+                                    {% endif %}
+                                    {% if beta_config.performance_monitoring %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-chart-line text-primary"></i> Performance Monitoring
+                                        </li>
+                                    {% endif %}
+                                    {% if beta_config.beta_logging %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-file-alt text-secondary"></i> Enhanced Logging
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <h4>🚨 Beta Considerations</h4>
+                            <div class="alert alert-warning">
+                                <ul class="mb-0">
+                                    <li>This is a beta version - expect occasional issues</li>
+                                    <li>Features may change without notice</li>
+                                    <li>Database schema may evolve</li>
+                                    <li>Not recommended for production use without thorough testing</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <h4>📝 Beta Testing</h4>
+                            <p>Help improve Project Tracker by testing these beta features:</p>
+                            <ul>
+                                <li>Enhanced project management with stages</li>
+                                <li>Improved task dependency handling</li>
+                                <li>Business day calculations for project timelines</li>
+                                <li>File attachment support for tasks</li>
+                                <li>Advanced project tracking capabilities</li>
+                            </ul>
+                        </div>
+
+                    {% else %}
+                        <div class="alert alert-secondary">
+                            <h5>ℹ️ Standard Version</h5>
+                            <p>You are currently running the standard version of Project Tracker.</p>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h4>📋 Current Features</h4>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        <i class="fas fa-project-diagram text-primary"></i> Project Management
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-tasks text-success"></i> Task Tracking
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-calendar text-info"></i> Timeline Management
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-list text-warning"></i> Todo Lists
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-paperclip text-secondary"></i> File Attachments
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h4>🚀 Try Beta Version</h4>
+                                <p>To access beta features, you need to:</p>
+                                <ol>
+                                    <li>Install beta dependencies</li>
+                                    <li>Enable beta configuration</li>
+                                    <li>Switch to beta branch</li>
+                                </ol>
+                                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                                    <i class="fas fa-home"></i> Back to Projects
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <h4>🔗 Quick Links</h4>
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-home"></i> Projects
+                            </a>
+                            {% if beta_mode %}
+                                <a href="/beta" class="btn btn-outline-info">
+                                    <i class="fas fa-info-circle"></i> Beta Info
+                                </a>
+                            {% endif %}
+                            <a href="https://github.com/xomnia/project_tracker" class="btn btn-outline-secondary" target="_blank">
+                                <i class="fab fa-github"></i> Main Repository
+                            </a>
+                            {% if beta_mode %}
+                                <a href="https://github.com/xomnia/project_tracker_beta" class="btn btn-outline-warning" target="_blank">
+                                    <i class="fas fa-code-branch"></i> Beta Repository
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
