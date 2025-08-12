@@ -1,0 +1,1422 @@
+{% extends 'base.html' %}
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        {% set stage_badge =
+           'bg-danger'  if project.stage == 'Planning'        else
+           'bg-warning' if project.stage == 'Pre-Construction' else
+           'bg-info'    if project.stage == 'Construction'    else
+           'bg-primary' if project.stage == 'Finish Work'     else
+           'bg-success' %}
+        <h2>
+            {{ project.name }}
+            <a href="{{ url_for('edit_project', project_id=project.id) }}" class="btn btn-outline-primary me-2">Edit Project</a>
+        </h2>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Projects</a>
+    </div>
+    
+    <!-- Desktop Stage Buttons -->
+    <div id="stage-bar" class="d-none d-md-flex mb-4">
+        {% for s in ['Planning','Pre-Construction','Construction','Finish Work','Complete'] %}
+            {% set active = (s == project.stage) %}
+            <button class="btn btn-sm me-2 stage-btn
+                           {% if active %}btn
+                               {% if s == 'Planning'           %}btn-danger
+                               {% elif s == 'Pre-Construction' %}btn-warning
+                               {% elif s == 'Construction'     %}btn-info
+                               {% elif s == 'Finish Work'      %}btn-primary
+                               {% else %}btn-success{% endif %}
+                           {% else %}btn-outline-secondary{% endif %}"
+                    data-stage="{{ s }}">
+                {{ s }}
+            </button>
+        {% endfor %}
+    </div>
+    
+    <!-- Mobile Stage Dropdown -->
+    <div class="d-md-none mb-4">
+        <label for="stage-select" class="form-label">Project Stage:</label>
+        <select id="stage-select" class="form-select">
+            {% for s in ['Planning','Pre-Construction','Construction','Finish Work','Complete'] %}
+                {% set active = (s == project.stage) %}
+                <option value="{{ s }}" {% if active %}selected{% endif %}>
+                    {{ s }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <p>{{ project.description }}</p>
+
+    <h4 class="mt-4">Tasks</h4>
+    
+    <!-- Desktop Tasks Table -->
+    <div class="d-none d-md-block">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Vendor</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Follows</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in project.tasks %}
+                    {% set row_cls = 'strike' if t.status == 'Complete' else '' %}
+                    <tr class="{{ row_cls }}" data-id="{{ t.id }}">
+                        <td>{{ t.name }}<span class="ms-1 text-muted note-icon" role="button" data-id="{{ t.id }}" data-notes="{{ t.notes|default('', true)|e }}">📝</span></td>
+                        <td>{{ t.category }}</td>
+                        <td>{{ t.vendor or '' }}</td>
+                        <td>{{ t.start_date.strftime('%Y-%m-%d') if t.start_date else 'No Start Date' }}</td>
+                        <td class="{% if t.id in overdue_tasks %}text-danger fw-bold{% endif %}">
+                            {{ t.end_date.strftime('%Y-%m-%d') if t.end_date else 'No End Date' }}
+                        </td>
+                        <td>
+                            {% if t.dependency %}
+                                <span class="badge bg-info" data-dependency-id="{{ t.dependency.id }}">{{ t.dependency.name }}</span>
+                            {% else %}
+                                <span class="text-muted">None</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set badge =
+                                 'bg-secondary' if t.status == 'Not Started' else
+                                 'bg-warning'  if t.status == 'In Progress' else
+                                 'bg-success'  %}
+                            <span class="badge {{ badge }}">{{ t.status }}</span>
+                        </td>
+                        <td class="text-nowrap" data-id="{{ t.id }}" style="width: 120px;">
+                            <button class="btn btn-sm btn-outline-secondary me-1 task-edit">Edit</button>
+                            <form action="{{ url_for('delete_task', task_id=t.id) }}"
+                                  method="post" class="d-inline"
+                                  onsubmit="return confirm('Delete this task?');">
+                                <button class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Mobile Tasks List -->
+    <div class="d-md-none">
+        {% for t in project.tasks %}
+            {% set row_cls = 'strike' if t.status == 'Complete' else '' %}
+            <div class="card mb-2 {{ row_cls }}" data-id="{{ t.id }}">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">{{ t.name }}</h6>
+                            <p class="card-text mb-0 {% if t.id in overdue_tasks %}text-danger fw-bold{% endif %}">
+                                End: {{ t.end_date.strftime('%Y-%m-%d') if t.end_date else 'No End Date' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop Add Task Form -->
+    <div class="d-none d-md-block">
+        <h4 class="mt-4">Add Task</h4>
+        <form method="post">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <input type="text" name="task_name" class="form-control" placeholder="Task name" required>
+                </div>
+                <div class="col-md-1">
+                    <select name="category" class="form-select">
+                        <option value="">Category</option>
+                        <option>Electrical</option>
+                        <option>Plumbing</option>
+                        <option>Construction</option>
+                        <option>HVAC</option>
+                        <option>Logistical</option>
+                        <option>Finish Work</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="text" name="vendor" class="form-control" placeholder="Vendor">
+                </div>
+                <div class="col-md-1">
+                    <input type="date" name="start_date" class="form-control" placeholder="Start Date">
+                </div>
+                <div class="col-md-1">
+                    <input type="date" name="end_date" class="form-control" placeholder="End Date">
+                </div>
+                <div class="col-md-2">
+                    <select name="dependency_id" class="form-select">
+                        <option value="">Follows (Optional)</option>
+                        {% for task in project.tasks %}
+                            <option value="{{ task.id }}">{{ task.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <select name="status" class="form-select">
+                        <option>Not Started</option>
+                        <option>In Progress</option>
+                        <option>Complete</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-success w-100">Add Task</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!--  Notes modal (paste exactly once, near the bottom of this template) -->
+    <div class="modal fade" id="noteModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Task Notes & Files</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label for="note-text" class="form-label">Notes:</label>
+                            <textarea id="note-text" class="form-control" rows="6"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">File Attachments:</label>
+                            <div class="mb-3">
+                                <input type="file" id="file-upload" class="form-control" multiple>
+                                <button id="upload-btn" class="btn btn-outline-primary btn-sm mt-2">Upload Files</button>
+                            </div>
+                            <div id="attachments-list">
+                                <!-- Attachments will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button id="note-save" class="btn btn-primary">Save Notes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Desktop Layout -->
+    <div class="d-none d-md-block">
+        <div class="row mt-4">
+            <!-- To-Do List -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Project To-Do List</div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <input id="todo-input" type="text" class="form-control" placeholder="New to-do …">
+                            <button id="todo-add" class="btn btn-success">Add</button>
+                        </div>
+
+                        <ul id="todo-list" class="list-group">
+                            {% for td in project.todos %}
+                                <li class="list-group-item d-flex align-items-center" data-id="{{ td.id }}">
+                                    <input class="form-check-input me-2 todo-check" type="checkbox"
+                                           {% if td.completed %}checked{% endif %}>
+                                    <span class="flex-grow-1 {% if td.completed %}text-decoration-line-through text-muted{% endif %}">
+                                        {{ td.text }}
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-danger todo-del">&times;</button>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Materials Manager -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Materials Manager</div>
+                    <div class="card-body">
+                        <!-- Dropdown to select task -->
+                        <select id="taskSelector" class="form-select mb-3">
+                            <option value="general">General Materials</option>
+                            {% for task in project.tasks %}
+                                <option value="{{ task.id }}">{{ task.name }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <!-- Material List -->
+                        <!-- Column Headings -->
+                        <div class="d-flex justify-content-between px-3 mb-1">
+                            <strong>Material</strong>
+                            <strong>Ordered</strong>
+                        </div>
+
+                        <ul id="materialList" class="list-group mb-3">
+                            {% for material in materials %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ material.id }}">
+                                    <div class="d-flex align-items-center w-100">
+                                        
+                                        <!-- Ordered Checkbox -->
+                                        <div class="d-flex align-items-center me-3">
+                                            <input type="checkbox" class="form-check-input ordered-check me-2" style="transform: scale(1.5);" {% if material.ordered %}checked{% endif %}>
+                                            <small class="text-muted">Ordered</small>
+                                        </div>
+                                        
+                                        <!-- Material Name -->
+                                        <span class="flex-grow-1 material-name {% if material.ordered %}text-decoration-line-through text-muted{% endif %}" style="cursor: pointer;">
+                                            {{ material.name }}
+                                        </span>
+
+                                        <!-- Decision Link -->
+                                        <a href="#" class="btn btn-sm btn-outline-secondary ms-3 decision-btn" data-bs-toggle="modal" data-bs-target="#decisionModal" data-id="{{ material.id }}">
+                                            Decide
+                                        </a>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+
+                        <!-- Input to add new material -->
+                        <div class="input-group">
+                            <input type="text" id="newMaterialInput" class="form-control" placeholder="Add material...">
+                            <button class="btn btn-outline-primary" id="addMaterialBtn">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mobile Layout - Stacked -->
+    <div class="d-md-none">
+        <!-- To-Do List -->
+        <div class="card mt-4">
+            <div class="card-header">Project To-Do List</div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input id="todo-input-mobile" type="text" class="form-control" placeholder="New to-do …">
+                    <button id="todo-add-mobile" class="btn btn-success">Add</button>
+                </div>
+
+                <ul id="todo-list-mobile" class="list-group">
+                    {% for td in project.todos %}
+                        <li class="list-group-item d-flex align-items-center" data-id="{{ td.id }}">
+                            <input class="form-check-input me-2 todo-check-mobile" type="checkbox"
+                                   {% if td.completed %}checked{% endif %}>
+                            <span class="flex-grow-1 {% if td.completed %}text-decoration-line-through text-muted{% endif %}">
+                                {{ td.text }}
+                            </span>
+                            <button class="btn btn-sm btn-outline-danger todo-del-mobile">&times;</button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Materials Manager -->
+        <div class="card mt-4">
+            <div class="card-header">Materials Manager</div>
+            <div class="card-body">
+                <!-- Dropdown to select task -->
+                <select id="taskSelector-mobile" class="form-select mb-3">
+                    <option value="general">General Materials</option>
+                    {% for task in project.tasks %}
+                        <option value="{{ task.id }}">{{ task.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- Material List -->
+                <div class="d-flex justify-content-between px-3 mb-1">
+                    <strong>Material</strong>
+                    <strong>Ordered</strong>
+                </div>
+
+                <ul id="materialList-mobile" class="list-group mb-3">
+                    {% for material in materials %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ material.id }}">
+                            <div class="d-flex align-items-center w-100">
+                                
+                                <!-- Ordered Checkbox -->
+                                <div class="d-flex align-items-center me-3">
+                                    <input type="checkbox" class="form-check-input ordered-check-mobile me-2" style="transform: scale(1.5);" {% if material.ordered %}checked{% endif %}>
+                                    <small class="text-muted">Ordered</small>
+                                </div>
+                                
+                                <!-- Material Name -->
+                                <span class="flex-grow-1 material-name-mobile {% if material.ordered %}text-decoration-line-through text-muted{% endif %}" style="cursor: pointer;">
+                                    {{ material.name }}
+                                </span>
+
+                                <!-- Decision Link -->
+                                <a href="#" class="btn btn-sm btn-outline-secondary ms-3 decision-btn-mobile" data-bs-toggle="modal" data-bs-target="#decisionModal" data-id="{{ material.id }}">
+                                    Decide
+                                </a>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <!-- Input to add new material -->
+                <div class="input-group">
+                    <input type="text" id="newMaterialInput-mobile" class="form-control" placeholder="Add material...">
+                    <button class="btn btn-outline-primary" id="addMaterialBtn-mobile">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decision Modal -->
+    <div class="modal fade" id="decisionModal" tabindex="-1" aria-labelledby="decisionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex justify-content-between w-100 align-items-center">
+                        <span id="decisionModalTitle">Choices</span>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" id="deselect-variant" data-material-id="" title="Deselect All Variants">
+                                <i class="bi bi-x-circle"></i> Deselect
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" id="deleteMaterialBtn" title="Delete Material">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Placeholder content - dynamically populated -->
+                    <div id="decision-content">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const projId = {{ project.id }};
+            const listEl = document.getElementById('todo-list');
+            const inputEl = document.getElementById('todo-input');
+            const addBtn = document.getElementById('todo-add');
+
+            // helper to inject a LI element
+            function appendTodo(td) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex align-items-center';
+                li.dataset.id = td.id;
+                li.innerHTML = `
+                   <input class="form-check-input me-2 todo-check" type="checkbox">
+                   <span class="flex-grow-1">${td.text}</span>
+                   <button class="btn btn-sm btn-outline-danger todo-del">&times;</button>`;
+                listEl.append(li);
+            }
+
+            // Add
+            async function addTodo() {
+                const text = inputEl.value.trim();
+                if (!text) return;
+                const r = await fetch(`/project/${projId}/todo`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text})
+                });
+                if (r.ok) {
+                    appendTodo(await r.json());
+                    inputEl.value = '';
+                    inputEl.focus();
+                }
+            }
+            addBtn.onclick = addTodo;
+            inputEl.addEventListener('keypress', e => { if (e.key === 'Enter') addTodo(); });
+
+            // Delegate toggle / delete
+            listEl.addEventListener('click', async e => {
+                const li = e.target.closest('li');
+                if (!li) return;
+                const id = li.dataset.id;
+
+                // Toggle completed
+                if (e.target.classList.contains('todo-check')) {
+                    const res = await fetch(`/todo/${id}/toggle`, {method: 'PATCH'});
+                    if (res.ok) {
+                        const {completed} = await res.json();
+                        const span = li.querySelector('span');
+                        span.classList.toggle('text-decoration-line-through', completed);
+                        span.classList.toggle('text-muted', completed);
+                    }
+                }
+                // Delete
+                if (e.target.classList.contains('todo-del')) {
+                    const res = await fetch(`/todo/${id}`, {method: 'DELETE'});
+                    if (res.ok) li.remove();
+                }
+            });
+        })();
+    </script>
+
+    <script>
+        (() => {
+            const categories = ['Electrical','Plumbing','Construction','HVAC', 'Logistical', 'Finish Work'];
+            const statuses = ['Not Started','In Progress','Complete'];
+
+            // helper to build a <select>
+            function makeSelect(list, value) {
+                const s = document.createElement('select');
+                s.className = 'form-select form-select-sm';
+                list.forEach(opt => {
+                    const o = document.createElement('option');
+                    o.value = o.textContent = opt;
+                    if (opt === value) o.selected = true;
+                    s.append(o);
+                });
+                return s;
+            }
+
+            // helper to build a dependency select
+            function makeDependencySelect(tasks, currentDependencyId, currentTaskId) {
+                const s = document.createElement('select');
+                s.className = 'form-select form-select-sm';
+                
+                // Add "None" option
+                const noneOption = document.createElement('option');
+                noneOption.value = '';
+                noneOption.textContent = 'None';
+                if (!currentDependencyId) noneOption.selected = true;
+                s.append(noneOption);
+                
+                // Add task options (excluding current task)
+                tasks.forEach(task => {
+                    if (task.id != currentTaskId) {
+                        const o = document.createElement('option');
+                        o.value = task.id;
+                        o.textContent = task.name;
+                        if (task.id == currentDependencyId) o.selected = true;
+                        s.append(o);
+                    }
+                });
+                return s;
+            }
+
+            document.querySelectorAll('.task-edit').forEach(btn => {
+                btn.addEventListener('click', async e => {
+                    const tdBtn = e.target.closest('td');
+                    const tr = tdBtn.parentElement;
+                    const cells = tr.children;   // [Name, Category, Vendor, StartDate, EndDate, Follows, Status, Buttons]
+                    const taskId = tdBtn.dataset.id;
+
+                    const isEdit = btn.textContent === 'Edit';
+
+                    if (isEdit) {
+                        // --- switch to input mode ----------------
+                        // Name
+                        const iconEl = cells[0].querySelector('.note-icon');
+                        const currentName = iconEl
+                              ? iconEl.previousSibling.textContent.trim()   // text before icon
+                              : cells[0].textContent.trim();
+                        const currentNotes = iconEl ? iconEl.dataset.notes : '';
+
+                        // stash notes so we can restore after Save
+                        tdBtn.dataset.notes = currentNotes;
+
+                        const nameInput = document.createElement('input');
+                        nameInput.type = 'text';
+                        nameInput.className = 'form-control form-control-sm';
+                        nameInput.value = currentName;
+                        cells[0].innerHTML = '';
+                        cells[0].append(nameInput);
+
+                        // Category
+                        const curCat = cells[1].textContent.trim();
+                        cells[1].innerHTML = '';
+                        cells[1].append(makeSelect(categories, curCat));
+
+                        // Vendor
+                        const vendorInput = document.createElement('input');
+                        vendorInput.type = 'text';
+                        vendorInput.className = 'form-control form-control-sm';
+                        vendorInput.value = cells[2].textContent.trim();
+                        cells[2].innerHTML = '';
+                        cells[2].append(vendorInput);
+
+                        // Start date
+                        const startDateInput = document.createElement('input');
+                        startDateInput.type = 'date';
+                        startDateInput.className = 'form-control form-control-sm';
+                        const curStartDate = cells[3].textContent.trim();
+                        if (curStartDate && curStartDate !== 'No Start Date') startDateInput.value = curStartDate;
+                        cells[3].innerHTML = '';
+                        cells[3].append(startDateInput);
+
+                        // End date
+                        const endDateInput = document.createElement('input');
+                        endDateInput.type = 'date';
+                        endDateInput.className = 'form-control form-control-sm';
+                        const curEndDate = cells[4].textContent.trim();
+                        if (curEndDate && curEndDate !== 'No End Date') endDateInput.value = curEndDate;
+                        cells[4].innerHTML = '';
+                        cells[4].append(endDateInput);
+
+                        // Dependency
+                        const curDependency = cells[5].querySelector('.badge');
+                        const currentDependencyId = curDependency ? curDependency.dataset.dependencyId : null;
+                        cells[5].innerHTML = '';
+                        const dependencySelect = makeDependencySelect({{ tasks_json|tojson }}, currentDependencyId, taskId);
+                        cells[5].append(dependencySelect);
+
+                        // Status
+                        const curStatus = cells[6].textContent.trim();
+                        cells[6].innerHTML = '';
+                        cells[6].append(makeSelect(statuses, curStatus));
+
+                        btn.textContent = 'Save';
+                        btn.classList.remove('btn-outline-secondary');
+                        btn.classList.add('btn-primary');
+                    } else {
+                        // --- gather values & save ----------------
+                        const payload = {
+                            name: cells[0].querySelector('input').value.trim(),
+                            category: cells[1].querySelector('select').value,
+                            vendor: cells[2].querySelector('input').value.trim(),
+                            start_date: cells[3].querySelector('input').value || null,
+                            end_date: cells[4].querySelector('input').value || null,
+                            dependency_id: cells[5].querySelector('select').value || null,
+                            status: cells[6].querySelector('select').value
+                        };
+
+                        const res = await fetch(`/task/${taskId}`, {
+                            method: 'PATCH',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (res.ok) {
+                            const responseData = await res.json();
+                            
+                            // swap back to display mode
+                            const notesVal = tdBtn.dataset.notes || '';
+                            cells[0].innerHTML = `
+                                ${payload.name}
+                                <span class="ms-1 text-muted note-icon"
+                                      role="button"
+                                      data-id="${taskId}"
+                                      data-notes="${notesVal}">📝</span>`;
+                            cells[1].textContent = payload.category;
+                            cells[2].textContent = payload.vendor;
+                            cells[3].textContent = payload.start_date || 'No Start Date';
+                            cells[4].textContent = payload.end_date || 'No End Date';
+                            
+                            // Dependency display
+                            if (payload.dependency_id) {
+                                const dependencyTask = {{ tasks_json|tojson }}.find(t => t.id == payload.dependency_id);
+                                cells[5].innerHTML = `<span class="badge bg-info" data-dependency-id="${payload.dependency_id}">${dependencyTask ? dependencyTask.name : 'Unknown'}</span>`;
+                            } else {
+                                cells[5].innerHTML = '<span class="text-muted">None</span>';
+                            }
+                            
+                            const badgeClass =
+                                payload.status === 'Complete'    ? 'bg-success'  :
+                                payload.status === 'In Progress' ? 'bg-warning'  :
+                                                                   'bg-secondary';
+                            cells[6].innerHTML = `<span class="badge ${badgeClass}">${payload.status}</span>`;
+                            
+                            // strike row if status is Complete
+                            tr.classList.toggle('strike', payload.status === 'Complete');
+                            
+                            // Update the tasks_json array with the new data
+                            const taskIndex = {{ tasks_json|tojson }}.findIndex(t => t.id == taskId);
+                            if (taskIndex !== -1) {
+                                {{ tasks_json|tojson }}[taskIndex] = {
+                                    ...{{ tasks_json|tojson }}[taskIndex],
+                                    name: payload.name,
+                                    start_date: payload.start_date,
+                                    end_date: payload.end_date,
+                                    dependency_id: payload.dependency_id
+                                };
+                            }
+                            
+                            // Check if this task has dependent tasks that were moved
+                            // and update their display in the table
+                            if (responseData.dependent_tasks_updated) {
+                                responseData.dependent_tasks_updated.forEach(dependentTask => {
+                                    const dependentRow = document.querySelector(`tr[data-id="${dependentTask.id}"]`);
+                                    if (dependentRow) {
+                                        const dependentCells = dependentRow.children;
+                                        
+                                        // Update start date
+                                        if (dependentTask.start_date) {
+                                            dependentCells[3].textContent = dependentTask.start_date;
+                                        }
+                                        
+                                        // Update end date
+                                        if (dependentTask.end_date) {
+                                            dependentCells[4].textContent = dependentTask.end_date;
+                                            
+                                            // Update overdue styling
+                                            const today = new Date().toISOString().split('T')[0];
+                                            if (dependentTask.end_date < today) {
+                                                dependentCells[4].className = 'text-danger fw-bold';
+                                            } else {
+                                                dependentCells[4].className = '';
+                                            }
+                                        }
+                                        
+                                        // Update the tasks_json array
+                                        const depTaskIndex = {{ tasks_json|tojson }}.findIndex(t => t.id == dependentTask.id);
+                                        if (depTaskIndex !== -1) {
+                                            {{ tasks_json|tojson }}[depTaskIndex].start_date = dependentTask.start_date;
+                                            {{ tasks_json|tojson }}[depTaskIndex].end_date = dependentTask.end_date;
+                                        }
+                                    }
+                                });
+                            }
+                            
+                            btn.textContent = 'Edit';
+                            btn.classList.remove('btn-primary');
+                            btn.classList.add('btn-outline-secondary');
+                        } else {
+                            const errorData = await res.json();
+                            alert('Error saving task: ' + (errorData.error || 'Unknown error'));
+                        }
+                    }
+                });
+            });
+        })();
+    </script>
+
+    <script>
+        (() => {
+            const projId = {{ project.id }};
+            const bar = document.getElementById('stage-bar');
+            const badge = document.querySelector('h2 .badge');
+            const mobileSelect = document.getElementById('stage-select');
+
+            const colour = stage => ({
+                'Planning':'danger', 'Pre-Construction':'warning',
+                'Construction':'info','Finish Work':'primary','Complete':'success'
+            }[stage]);
+
+            // Function to update the mobile dropdown
+            function updateMobileDropdown() {
+                const selectedStage = mobileSelect.value;
+                mobileSelect.querySelectorAll('option').forEach(opt => {
+                    opt.selected = opt.value === selectedStage;
+                });
+            }
+
+            // Initial update
+            updateMobileDropdown();
+
+            // Add event listener for mobile dropdown change
+            mobileSelect.addEventListener('change', async (e) => {
+                const newStage = e.target.value;
+                
+                // PATCH to server
+                const r = await fetch(`/project/${projId}/stage`, {
+                    method:'PATCH',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({stage:newStage})
+                });
+                if (!r.ok) return alert('Error updating stage');
+
+                // Update bar buttons
+                bar.querySelectorAll('.stage-btn').forEach(b => {
+                    const active = b.dataset.stage === newStage;
+                    b.className = 'btn btn-sm me-2 stage-btn ' +
+                        (active ? 'btn btn-' + colour(newStage) : 'btn-outline-secondary');
+                });
+
+                // Update badge if it exists
+                if (badge) {
+                    badge.textContent = newStage;
+                    badge.className = 'badge bg-' + colour(newStage);
+                }
+            });
+
+            // Update badge
+            if (badge) {
+                badge.textContent = project.stage;
+                badge.className = 'badge bg-' + colour(project.stage);
+            }
+
+            // Update mobile dropdown based on bar buttons
+            bar.addEventListener('click', async e => {
+                const btn = e.target.closest('.stage-btn');
+                if (!btn) return;
+                const newStage = btn.dataset.stage;
+
+                // PATCH to server
+                const r = await fetch(`/project/${projId}/stage`, {
+                    method:'PATCH',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({stage:newStage})
+                });
+                if (!r.ok) return alert('Error updating stage');
+
+                // Update all button states
+                bar.querySelectorAll('.stage-btn').forEach(b => {
+                    const active = b.dataset.stage === newStage;
+                    b.className = 'btn btn-sm me-2 stage-btn ' +
+                        (active ? 'btn btn-' + colour(newStage) : 'btn-outline-secondary');
+                });
+
+                // update badge
+                if (badge) {
+                    badge.textContent = newStage;
+                    badge.className = 'badge bg-' + colour(newStage);
+                }
+
+                // update mobile dropdown
+                mobileSelect.value = newStage;
+            });
+        })();
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Bootstrap has finished loading at this point
+            const modalEl = document.getElementById('noteModal');
+            const bsModal = new bootstrap.Modal(modalEl);
+            const textarea = document.getElementById('note-text');
+            const fileUpload = document.getElementById('file-upload');
+            const uploadBtn = document.getElementById('upload-btn');
+            const attachmentsList = document.getElementById('attachments-list');
+            let currentId = null;
+
+            // Open modal (event delegation so it works for new rows too)
+            document.addEventListener('click', e => {
+                const icon = e.target.closest('.note-icon');
+                if (!icon) return;
+
+                currentId = icon.dataset.id;
+                textarea.value = icon.dataset.notes;
+                loadAttachments(currentId);
+                bsModal.show();
+            });
+
+            // Load attachments for a task
+            async function loadAttachments(taskId) {
+                try {
+                    const response = await fetch(`/task/${taskId}/attachments`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        displayAttachments(data.attachments);
+                    }
+                } catch (error) {
+                    console.error('Error loading attachments:', error);
+                }
+            }
+
+            // Display attachments in the list
+            function displayAttachments(attachments) {
+                attachmentsList.innerHTML = '';
+                if (attachments.length === 0) {
+                    attachmentsList.innerHTML = '<p class="text-muted small">No files attached</p>';
+                    return;
+                }
+
+                attachments.forEach(attachment => {
+                    const attachmentDiv = document.createElement('div');
+                    attachmentDiv.className = 'attachment-item border rounded p-2 mb-2';
+                    attachmentDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold small">${attachment.filename}</div>
+                                <div class="text-muted small">${attachment.file_size} bytes • ${attachment.uploaded_at}</div>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/attachment/${attachment.id}/download" class="btn btn-outline-primary btn-sm">📥</a>
+                                <button class="btn btn-outline-danger btn-sm delete-attachment" data-id="${attachment.id}">🗑️</button>
+                            </div>
+                        </div>
+                    `;
+                    attachmentsList.appendChild(attachmentDiv);
+                });
+            }
+
+            // Handle file uploads
+            uploadBtn.addEventListener('click', async () => {
+                const files = fileUpload.files;
+                if (files.length === 0) {
+                    alert('Please select files to upload');
+                    return;
+                }
+
+                for (const file of files) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        const response = await fetch(`/task/${currentId}/upload`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            // Reload attachments
+                            loadAttachments(currentId);
+                            // Clear file input
+                            fileUpload.value = '';
+                        } else {
+                            // Try to get error details, but handle non-JSON responses
+                            let errorMessage = 'Upload failed';
+                            try {
+                                const errorData = await response.json();
+                                errorMessage = errorData.error || 'Upload failed';
+                            } catch (jsonError) {
+                                // If response isn't JSON, get the text
+                                const responseText = await response.text();
+                                console.error('Non-JSON response:', responseText);
+                                errorMessage = `Upload failed (HTTP ${response.status})`;
+                            }
+                            alert(errorMessage);
+                        }
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        alert(`Upload failed: ${error.message}`);
+                    }
+                }
+            });
+
+            // Handle attachment deletion
+            attachmentsList.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('delete-attachment')) {
+                    const attachmentId = e.target.dataset.id;
+                    if (confirm('Delete this file?')) {
+                        try {
+                            const response = await fetch(`/attachment/${attachmentId}`, {
+                                method: 'DELETE'
+                            });
+                            if (response.ok) {
+                                loadAttachments(currentId);
+                            } else {
+                                alert('Failed to delete file');
+                            }
+                        } catch (error) {
+                            alert(`Delete failed: ${error.message}`);
+                        }
+                    }
+                }
+            });
+
+            // Save
+            document.getElementById('note-save').addEventListener('click', async () => {
+                const res = await fetch(`/task/${currentId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes: textarea.value })
+                });
+                if (!res.ok) { alert('Error saving notes'); return; }
+
+                // keep the icon's data-notes up-to-date
+                document.querySelector(`.note-icon[data-id="${currentId}"]`)
+                        .dataset.notes = textarea.value;
+                bsModal.hide();
+            });
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const taskSelector = document.getElementById("taskSelector");
+            const materialList = document.getElementById("materialList");
+            const addMaterialBtn = document.getElementById("addMaterialBtn");
+            const newMaterialInput = document.getElementById("newMaterialInput");
+            const decisionContent = document.getElementById("decision-content");
+
+            function loadMaterials() {
+                const taskId = taskSelector.value;
+                fetch(`/materials/{{ project.id }}/${taskId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        materialList.innerHTML = '';
+                        data.materials.forEach(material => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            li.dataset.id = material.id;
+
+                            li.innerHTML = `
+                                <div class="d-flex align-items-center justify-content-between w-100">
+                                 <!-- Left: Material Name -->
+                                 <div class="flex-grow-1">
+                                   <span class="material-name ${material.ordered ? 'text-decoration-line-through text-muted' : ''}" style="cursor:pointer;">
+                                     ${material.name}
+                                   </span>
+                                 </div>
+
+                                 <!-- Right: Choose Button + Ordered Checkbox -->
+                                 <div class="d-flex align-items-center ms-3">
+                                   <a href="#" class="btn btn-sm btn-outline-secondary me-3 decision-btn"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#decisionModal"
+                                      data-id="${material.id}">
+                                     Choose ${material.has_picked ? '<i class="bi bi-check-circle-fill text-success ms-1"></i>' : ''}
+                                   </a>
+                                   <div class="d-flex flex-column align-items-center">
+                                     <input type="checkbox" class="form-check-input ordered-check"
+                                            style="transform: scale(1.6);" ${material.ordered ? 'checked' : ''}>
+                                   </div>
+                                 </div>
+                               </div>
+                             `;
+
+                            materialList.appendChild(li);
+                        });
+                    });
+            }
+
+            taskSelector.addEventListener("change", loadMaterials);
+
+            addMaterialBtn.addEventListener("click", () => {
+                const name = newMaterialInput.value.trim();
+                if (!name) return;
+
+                fetch(`/materials/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name,
+                        task_id: taskSelector.value === 'general' ? null : taskSelector.value,
+                        project_id: {{ project.id }}
+                    })
+                }).then(() => {
+                    newMaterialInput.value = '';
+                    loadMaterials();
+                });
+            });
+
+            // Open decision modal
+            document.body.addEventListener("click", function (e) {
+                if (e.target.classList.contains("decision-btn")) {
+                    const materialId = e.target.dataset.id;
+                    decisionContent.innerHTML = "<p>Loading...</p>";
+                    fetch(`/materials/decision/${materialId}`)
+                        .then(res => res.text())
+                        .then(html => {
+                            decisionContent.innerHTML = html;
+
+                            // Set the modal header title dynamically
+                            const materialName = e.target.closest("li").querySelector(".material-name").textContent.trim();
+                            document.getElementById("decisionModalTitle").textContent = `${materialName} Choices`;
+
+                            // Assign material ID to the delete button
+                            document.getElementById("deleteMaterialBtn").dataset.id = materialId;
+                            
+                            // Assign material ID to the deselect button
+                            document.getElementById("deselect-variant").dataset.materialId = materialId;
+                        });
+                }
+            });
+            
+            // Toggle show/hide of the add variant form
+            document.body.addEventListener("click", function (e) {
+                if (e.target.id === "showAddVariantForm") {
+                    const form = document.getElementById("addVariantForm");
+                    form.classList.toggle("d-none");
+                }
+            });
+
+            // Handle adding a new variant
+            document.body.addEventListener("submit", function (e) {
+                if (e.target.id === "decision-form") {
+                    e.preventDefault();
+
+                    const form = e.target;
+                    let url = form.querySelector("input[name='url']").value.trim();
+                    const note = form.querySelector("input[name='note']").value.trim();
+                    const cost = form.querySelector("input[name='cost']").value.trim();
+                    const materialId = form.querySelector("input[name='material_id']").value;
+
+                    // Validate URL only if provided and not empty
+                    if (url && url.trim()) {
+                        // Prepend http:// if missing
+                        if (!/^https?:\/\//i.test(url)) {
+                            url = 'http://' + url;
+                        }
+
+                        // Validate using URL + check for at least one dot in hostname
+                        let parsed;
+                        try {
+                            parsed = new URL(url);
+                        } catch {
+                            alert("Please enter a valid URL (e.g. https://example.com)");
+                            return;
+                        }
+
+                        if (!parsed.hostname.includes(".")) {
+                            alert("That doesn't look like a valid domain. Please enter something like example.com");
+                            return;
+                        }
+                    }
+
+                    fetch(`/materials/variant/add`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url, note, cost, material_id: materialId })
+                    })
+                    .then(res => res.text())
+                    .then(html => {
+                        document.getElementById("variant-list").innerHTML = html;
+                        form.reset();
+                        document.getElementById("addVariantForm").classList.add("d-none");
+                    });
+                }
+            });
+
+            // When a picked_variant radio is changed, send the update to the server
+            document.body.addEventListener("change", function (e) {
+                if (e.target.name === "picked_variant") {
+                    const pickedId = e.target.value;
+
+                    fetch("/materials/variant/pick", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ variant_id: pickedId })
+                    })
+                    .then(() => {
+                        // Reload materials list to update the checkmark
+                        loadMaterials();
+                    });
+                }
+            });
+
+            // Handle deselect button click
+            document.body.addEventListener("click", function (e) {
+                if (e.target.id === "deselect-variant") {
+                    const materialId = e.target.dataset.materialId;
+                    
+                    fetch("/materials/variant/unpick", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ material_id: materialId })
+                    })
+                    .then(() => {
+                        // Uncheck all radio buttons in the modal
+                        document.querySelectorAll('input[name="picked_variant"]').forEach(radio => {
+                            radio.checked = false;
+                        });
+                        
+                        // Reload materials list to update the checkmark
+                        loadMaterials();
+                    });
+                }
+            });
+
+            // Handle "ordered" checkbox toggle
+            document.body.addEventListener("change", function (e) {
+                if (e.target.classList.contains("ordered-check")) {
+                    const li = e.target.closest("li");
+                    const nameSpan = li.querySelector(".material-name");
+                    const isChecked = e.target.checked;
+
+                    if (isChecked) {
+                        nameSpan.classList.add("text-decoration-line-through", "text-muted");
+                    } else {
+                        nameSpan.classList.remove("text-decoration-line-through", "text-muted");
+                    }
+
+                    const materialId = li.dataset.id;
+                    fetch(`/materials/ordered/${materialId}`, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ ordered: isChecked })
+                    });
+                }
+            });
+            
+            document.body.addEventListener("click", function (e) {
+                const btn = e.target.closest("#deleteMaterialBtn");
+                if (btn) {
+                    const id = btn.dataset.id;
+                    if (confirm("Delete this material and all its variants?")) {
+                        fetch(`/materials/delete/${id}`, { method: "POST" })
+                            .then(() => {
+                                // Close modal
+                                const modalEl = document.getElementById("decisionModal");
+                                const modal = bootstrap.Modal.getInstance(modalEl);
+                                modal.hide();
+
+                                // Remove the material from the list
+                                const li = document.querySelector(`li[data-id="${id}"]`);
+                                if (li) li.remove();
+                            });
+                    }
+                }
+            });
+
+            // Edit or delete material name on click
+            document.body.addEventListener("click", function (e) {
+                if (e.target.classList.contains("material-name")) {
+                    const li = e.target.closest("li");
+                    const id = li.dataset.id;
+                    const currentName = e.target.textContent.trim();
+                    const newName = prompt("Edit or delete material:", currentName);
+
+                    if (newName === null) return;
+                    if (newName === "") {
+                        // Delete
+                        fetch(`/materials/delete/${id}`, { method: "POST" })
+                            .then(() => li.remove());
+                    } else {
+                        // Update
+                        fetch(`/materials/update/${id}`, {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({ name: newName })
+                        }).then(() => {
+                            e.target.textContent = newName;
+                        });
+                    }
+                }
+            });
+            
+            // Handle deleting a variant
+            document.body.addEventListener("click", function (e) {
+                const btn = e.target.closest(".delete-variant");
+                if (!btn) return;
+
+                // Prevent event bubbling
+                e.preventDefault();
+                e.stopPropagation();
+
+                const li = btn.closest("li");
+                const variantId = li.dataset.id;
+
+                console.log('Delete button clicked for variant:', variantId);
+
+                if (confirm("Delete this variant?")) {
+                    console.log('Delete confirmed, sending request...');
+                    fetch(`/materials/variant/delete/${variantId}`, {
+                        method: "POST"
+                    })
+                    .then(res => {
+                        console.log('Delete response status:', res.status);
+                        if (res.ok) {
+                            return res.text();
+                        } else {
+                            throw new Error('Delete failed');
+                        }
+                    })
+                    .then(html => {
+                        console.log('Updating variant list with new HTML');
+                        document.getElementById("variant-list").innerHTML = html;
+                    })
+                    .catch(error => {
+                        console.error('Error deleting variant:', error);
+                        alert('Failed to delete variant');
+                    });
+                } else {
+                    console.log('Delete cancelled');
+                }
+            });
+
+            loadMaterials(); // initial load
+        });
+    </script>
+
+    <script>
+        // Mobile-specific functionality for todo and materials
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mobile todo functionality
+            const todoInputMobile = document.getElementById('todo-input-mobile');
+            const todoAddMobile = document.getElementById('todo-add-mobile');
+            const todoListMobile = document.getElementById('todo-list-mobile');
+
+            if (todoAddMobile && todoInputMobile) {
+                // Add todo
+                async function addTodoMobile() {
+                    const text = todoInputMobile.value.trim();
+                    if (!text) return;
+                    const r = await fetch(`/project/{{ project.id }}/todo`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({text})
+                    });
+                    if (r.ok) {
+                        const todo = await r.json();
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item d-flex align-items-center';
+                        li.dataset.id = todo.id;
+                        li.innerHTML = `
+                           <input class="form-check-input me-2 todo-check-mobile" type="checkbox">
+                           <span class="flex-grow-1">${todo.text}</span>
+                           <button class="btn btn-sm btn-outline-danger todo-del-mobile">&times;</button>`;
+                        todoListMobile.append(li);
+                        todoInputMobile.value = '';
+                        todoInputMobile.focus();
+                    }
+                }
+                todoAddMobile.onclick = addTodoMobile;
+                todoInputMobile.addEventListener('keypress', e => { if (e.key === 'Enter') addTodoMobile(); });
+
+                // Delegate toggle / delete for mobile
+                todoListMobile.addEventListener('click', async e => {
+                    const li = e.target.closest('li');
+                    if (!li) return;
+                    const id = li.dataset.id;
+
+                    // Toggle completed
+                    if (e.target.classList.contains('todo-check-mobile')) {
+                        const res = await fetch(`/todo/${id}/toggle`, {method: 'PATCH'});
+                        if (res.ok) {
+                            const {completed} = await res.json();
+                            const span = li.querySelector('span');
+                            span.classList.toggle('text-decoration-line-through', completed);
+                            span.classList.toggle('text-muted', completed);
+                        }
+                    }
+                    // Delete
+                    if (e.target.classList.contains('todo-del-mobile')) {
+                        const res = await fetch(`/todo/${id}`, {method: 'DELETE'});
+                        if (res.ok) li.remove();
+                    }
+                });
+            }
+
+            // Mobile materials functionality
+            const taskSelectorMobile = document.getElementById('taskSelector-mobile');
+            const materialListMobile = document.getElementById('materialList-mobile');
+            const addMaterialBtnMobile = document.getElementById('addMaterialBtn-mobile');
+            const newMaterialInputMobile = document.getElementById('newMaterialInput-mobile');
+
+            if (taskSelectorMobile && materialListMobile) {
+                function loadMaterialsMobile() {
+                    const taskId = taskSelectorMobile.value;
+                    fetch(`/materials/{{ project.id }}/${taskId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            materialListMobile.innerHTML = '';
+                            data.materials.forEach(material => {
+                                const li = document.createElement('li');
+                                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                                li.dataset.id = material.id;
+
+                                li.innerHTML = `
+                                    <div class="d-flex align-items-center justify-content-between w-100">
+                                     <!-- Left: Material Name -->
+                                     <div class="flex-grow-1">
+                                       <span class="material-name-mobile ${material.ordered ? 'text-decoration-line-through text-muted' : ''}" style="cursor:pointer;">
+                                         ${material.name}
+                                       </span>
+                                     </div>
+
+                                     <!-- Right: Choose Button + Ordered Checkbox -->
+                                     <div class="d-flex align-items-center ms-3">
+                                       <a href="#" class="btn btn-sm btn-outline-secondary me-3 decision-btn-mobile"
+                                          data-bs-toggle="modal"
+                                          data-bs-target="#decisionModal"
+                                          data-id="${material.id}">
+                                         Choose ${material.has_picked ? '<i class="bi bi-check-circle-fill text-success ms-1"></i>' : ''}
+                                       </a>
+                                       <div class="d-flex flex-column align-items-center">
+                                         <input type="checkbox" class="form-check-input ordered-check-mobile"
+                                                style="transform: scale(1.6);" ${material.ordered ? 'checked' : ''}>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 `;
+
+                                materialListMobile.appendChild(li);
+                            });
+                        });
+                }
+
+                taskSelectorMobile.addEventListener('change', loadMaterialsMobile);
+
+                if (addMaterialBtnMobile && newMaterialInputMobile) {
+                    addMaterialBtnMobile.addEventListener('click', () => {
+                        const name = newMaterialInputMobile.value.trim();
+                        if (!name) return;
+
+                        fetch(`/materials/add`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                name,
+                                task_id: taskSelectorMobile.value === 'general' ? null : taskSelectorMobile.value,
+                                project_id: {{ project.id }}
+                            })
+                        }).then(() => {
+                            newMaterialInputMobile.value = '';
+                            loadMaterialsMobile();
+                        });
+                    });
+                }
+
+                // Initial load
+                loadMaterialsMobile();
+            }
+        });
+    </script>
+
+    <script>
+        // Dependency management and date adjustment logic
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to adjust dates when dependency changes
+            function adjustDatesForDependency(startDateInput, endDateInput, dependencySelect) {
+                const selectedDependencyId = dependencySelect.value;
+                if (!selectedDependencyId) return;
+                
+                // Find the dependency task
+                const dependencyTask = {{ tasks_json|tojson }}.find(t => t.id == selectedDependencyId);
+                if (!dependencyTask || !dependencyTask.end_date) return;
+                
+                const dependencyEndDate = new Date(dependencyTask.end_date);
+                const minStartDate = new Date(dependencyEndDate);
+                minStartDate.setDate(minStartDate.getDate() + 1);
+                
+                // Adjust to next weekday if it falls on weekend
+                while (minStartDate.getDay() === 0 || minStartDate.getDay() === 6) {
+                    minStartDate.setDate(minStartDate.getDate() + 1);
+                }
+                
+                // Update start date if it's before the minimum
+                if (startDateInput.value && new Date(startDateInput.value) < minStartDate) {
+                    startDateInput.value = minStartDate.toISOString().split('T')[0];
+                }
+                
+                // If end date is set, maintain the same duration
+                if (startDateInput.value && endDateInput.value) {
+                    const startDate = new Date(startDateInput.value);
+                    const endDate = new Date(endDateInput.value);
+                    const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+                    
+                    let newEndDate = new Date(startDateInput.value);
+                    let businessDaysAdded = 0;
+                    
+                    while (businessDaysAdded < duration) {
+                        newEndDate.setDate(newEndDate.getDate() + 1);
+                        if (newEndDate.getDay() !== 0 && newEndDate.getDay() !== 6) {
+                            businessDaysAdded++;
+                        }
+                    }
+                    
+                    // Adjust to next weekday if it falls on weekend
+                    while (newEndDate.getDay() === 0 || newEndDate.getDay() === 6) {
+                        newEndDate.setDate(newEndDate.getDate() + 1);
+                    }
+                    
+                    endDateInput.value = newEndDate.toISOString().split('T')[0];
+                }
+            }
+            
+            // Add event listeners for dependency changes
+            document.addEventListener('change', function(e) {
+                if (e.target.name === 'dependency_id' || e.target.classList.contains('dependency-select')) {
+                    const row = e.target.closest('tr');
+                    const startDateInput = row.querySelector('input[type="date"]:first-of-type');
+                    const endDateInput = row.querySelector('input[type="date"]:last-of-type');
+                    
+                    if (startDateInput && endDateInput) {
+                        adjustDatesForDependency(startDateInput, endDateInput, e.target);
+                    }
+                }
+            });
+        });
+    </script>
+
+{% endblock %}

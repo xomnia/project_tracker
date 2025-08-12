@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>All Projects</h2>
+        <a href="{{ url_for('add_project') }}" class="btn btn-success">+ New Project</a>
+    </div>
+    
+    <!-- Desktop version -->
+    <div class="d-none d-md-block">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th>Description</th>
+                    <th>Progress & Timeline</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proj in projects %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('project_detail', project_id=proj.project.id) }}">
+                                {{ proj.project.name }}
+                            </a>
+                        </td>
+                        <td>{{ proj.project.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ proj.project.description or '' }}</td>
+                        <td class="align-middle">
+                            <div class="d-flex align-items-center">
+                                {# compact bar (120 px); if pct = 0 we still show a 4 px sliver #}
+                                <div class="progress me-2" style="height:14px; width:120px;">
+                                    {% set bar_class =
+                                         'bg-danger'  if proj.pct < 34 else
+                                         'bg-warning' if proj.pct < 67 else
+                                         'bg-success' %}
+                                    <div class="progress-bar {{ bar_class }}"
+                                         role="progressbar"
+                                         style="width: {{ proj.pct }}%; min-width:4px;"
+                                         aria-valuenow="{{ proj.pct }}"
+                                         aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <small class="text-nowrap">
+                                    {% if proj.estimated_completion %}
+                                        Est: {{ proj.estimated_completion.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        No dates set
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </td>
+                        <td>
+                            <form action="{{ url_for('delete_project', project_id=proj.project.id) }}"
+                                  method="post"
+                                  onsubmit="return confirm('Delete this project?');">
+                                <button class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Mobile version -->
+    <div class="d-md-none">
+        <div class="row">
+            {% for proj in projects %}
+                <div class="col-12 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="{{ url_for('project_detail', project_id=proj.project.id) }}" class="text-decoration-none">
+                                    {{ proj.project.name }}
+                                </a>
+                            </h5>
+                            {% if proj.project.description %}
+                                <p class="card-text text-muted">{{ proj.project.description }}</p>
+                            {% endif %}
+                            <div class="d-flex align-items-center">
+                                <div class="progress me-2" style="height:12px; width:80px;">
+                                    {% set bar_class =
+                                         'bg-danger'  if proj.pct < 34 else
+                                         'bg-warning' if proj.pct < 67 else
+                                         'bg-success' %}
+                                    <div class="progress-bar {{ bar_class }}"
+                                         role="progressbar"
+                                         style="width: {{ proj.pct }}%; min-width:4px;"
+                                         aria-valuenow="{{ proj.pct }}"
+                                         aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <small class="text-nowrap">
+                                    {% if proj.estimated_completion %}
+                                        Est: {{ proj.estimated_completion.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        No dates set
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}
